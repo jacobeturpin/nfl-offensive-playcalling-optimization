@@ -78,7 +78,7 @@ class Agent:
 if __name__ == '__main__':
     env = DeliveryRouteEnv()
 
-    random_play(env)
+    # random_play(env)
 
     test_env = env
     agent = Agent(environment=DeliveryRouteEnv())
@@ -103,6 +103,8 @@ if __name__ == '__main__':
         if reward > 0.80:
             print("Solved in %d iterations!" % iter_no)
             break
-        if iter_no % 50:
+        if iter_no % 50 == 1:
             print("Iteration {}, best reward {}".format(iter_no, best_reward))
+        writer.add_scalar("best_reward", best_reward, iter_no)
     writer.close()
+		# tensorboard --logdir runs
