@@ -1,2 +1,6 @@
 pandas
 kaggle
+gym
+opencv-python
+tensorboardX
+#-e git+https://github.com/Kojoley/atari-py.git

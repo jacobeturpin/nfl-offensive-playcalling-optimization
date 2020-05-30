@@ -1,0 +1,17 @@
+name: nfl-offensive-playcalling-optimization
+channels:
+  - defaults
+  - pytorch
+dependencies:
+  - python=3.6
+  - pytorch
+  - torchvision
+  - cudatoolkit=10.1
+  - ignite
+  - opencv
+  - ffmpeg
+  - tensorboard=2.0
+  - tensorflow=2.0
+  - pip
+  - pip:
+    - -r requirements.txt
