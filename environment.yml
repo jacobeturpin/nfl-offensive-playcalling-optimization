@@ -1,4 +1,4 @@
-name: nfl-offensive-playcalling-optimization
+name: nfl-playcall-optim
 channels:
   - defaults
   - pytorch
