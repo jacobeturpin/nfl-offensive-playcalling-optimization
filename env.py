@@ -22,6 +22,7 @@ class NFLPlaycallingEnv(gym.Env):
 		# three discrete actions - pass, run, qb sneak
 		self.action_space = spaces.Discrete(3)
 
+
 		# observation space: field position, down, to_go, turnover, touchdown
 		self.observation_space = spaces.Tuple((
 			spaces.Discrete(100), #field position
@@ -29,7 +30,6 @@ class NFLPlaycallingEnv(gym.Env):
 			spaces.Discrete(99), #to_go
 			spaces.Discrete(2), #turnover
 			spaces.Discrete(2))) #touchdown
-
     
 	def step(self, action):
 		assert self.action_space.contains(action)
