@@ -1,7 +1,7 @@
 
 from env import NFLPlaycallingEnv
 
-def random_play(environment, episodes=5, render=False):
+def random_play(environment, episodes=1, render=False):
 
 	# for ep in range(episodes):
 
