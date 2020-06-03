@@ -113,7 +113,34 @@ class FieldPositionLoader(BaseLoader):
 
     def get_probability(self, down: int, to_go: int, position: int,
                         play: PlayType) -> List[PlayOutcome]:
-        pass
+
+        if play is PlayType.QB_SNEAK:
+            data = self.df[self.df['qb_scramle'] == 1 and
+                           self.df['play_type'] != 'no_play']
+        elif play is PlayType.RUN:
+            data = self.df[self.df['play_type'] == 'run']
+        elif play is PlayType.PASS:
+            data = self.df[self.df['play_type'] == 'pass']
+        else:
+            raise ValueError('PlayType not accepted for this class')
+
+        data = data[data['yardline_100'] == position]
+
+        def determine_outcome(row: pd.Series):
+            if row['interception']:
+                outcome = OutcomeType.INTERCEPTION
+            elif row['fumble_lost']:
+                outcome = OutcomeType.FUMBLE
+            else:
+                outcome = OutcomeType.BALL_MOVED
+            return outcome.name
+
+        data['outcome'] = data.apply(determine_outcome, axis=1)
+        count = len(data)
+        agg_cols = ['outcome', 'ydsnet']
+        prob_data = data.groupby(agg_cols).size().to_frame('prob') / count
+        prob_data.reset_index(inplace=True)
+        return [PlayOutcome(*p) for p in prob_data.values]
 
 
 if __name__ == '__main__':
@@ -122,6 +149,14 @@ if __name__ == '__main__':
 
     print('Prob')
     outcomes = dol.get_probability(2, 8, PlayType.RUN)
+
+    for o in outcomes:
+        print(o)
+
+    fol = FieldPositionLoader(fn)
+
+    print('Prob')
+    outcomes = fol.get_probability(2, 8, 80, PlayType.RUN)
 
     for o in outcomes:
         print(o)
