@@ -5,7 +5,7 @@ import gym
 from gym import spaces
 
 
-# import data_loader as nfl_data
+import data_loader as nfl_data
 
 # Create some test functions until api is built
 
@@ -16,12 +16,20 @@ class NFLPlaycallingEnv(gym.Env):
 
 	def __init__(self):
 		super(NFLPlaycallingEnv, self).__init__()
+
+		# Get data for probabilistic data
+		filename = './data/nfl-play-by-play.csv'
+		with open('data/dtypes.txt', 'r') as inf:
+			dtypes_dict = eval(inf.read())
+
+		self.FieldPos = nfl_data.FieldPositionLoader(filename, dtypes_dict=dtypes_dict)
+
+		# self._get_field_pos()
 		# Define action and observation space
 		# They must be gym.spaces objects
 
 		# three discrete actions - pass, run, qb sneak
 		self.action_space = spaces.Discrete(3)
-
 
 		# observation space: field position, down, to_go, turnover, touchdown
 		self.observation_space = spaces.Tuple((
@@ -30,7 +38,8 @@ class NFLPlaycallingEnv(gym.Env):
 			spaces.Discrete(99), #to_go
 			spaces.Discrete(2), #turnover
 			spaces.Discrete(2))) #touchdown
-    
+
+
 	def step(self, action):
 		assert self.action_space.contains(action)
 
@@ -58,13 +67,17 @@ class NFLPlaycallingEnv(gym.Env):
 
 	def _get_observation(self, action):
 		# TODO: replace with probabilistic outcomes
-		outcomes = self._gen_rand_outcomes()
+		outcomes = self._get_field_pos(action)
 		outcome_idx = random.choices([i for i, x in enumerate(outcomes)], weights=[x[2] for x in outcomes])
 		outcome = outcomes[outcome_idx[0]]
 		# print(f"outcome {outcome}")
+
 		if outcome[0] == 'BALL_MOVED':
 			# ball moved
-			if outcome[1] >= self.to_go:
+			if (outcome[1] + self.field_position) >= 100:
+				self.field_position = 100
+				self.touchdown = 1
+			elif outcome[1] >= self.to_go:
 				self.remaining_downs = 4 # well get decremented to 3 below
 				self.to_go = 10 #TODO: add goalline situations
 			else:
@@ -95,6 +108,25 @@ class NFLPlaycallingEnv(gym.Env):
 		outcomes.append(('TOUCHDOWN', 100-self.field_position, 0.1))
 
 		return outcomes
+	def _get_field_pos(self, action):
+		if action == 0:
+			action_val = nfl_data.PlayType.PASS
+		elif action == 1:
+			action_val = nfl_data.PlayType.RUN
+		elif action == 2:
+			action_val = nfl_data.PlayType.QB_SNEAK
+		else:
+			raise ValueError('invalid action')
+		# print(f"Action Taken {action_val}")
+
+		outcomes = self.FieldPos.get_probability(down = self.remaining_downs, 
+			to_go = self.to_go, 
+			position = 100-self.field_position, 
+			play = action_val
+			)
+
+		return outcomes
+
 
 	def reset(self):
 

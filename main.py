@@ -118,5 +118,5 @@ if __name__ == '__main__':
 			break
 		
 		
-    writer.close()
+		writer.close()
 		# tensorboard --logdir runs

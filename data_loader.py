@@ -30,9 +30,9 @@ class BaseLoader:
         filename (str): relative path to file containing data
     """
 
-    def __init__(self, filename: str):
+    def __init__(self, filename: str, dtypes_dict: dict = None):
         self.fn = filename
-        self.df = pd.read_csv(self.fn)
+        self.df = pd.read_csv(self.fn, dtype = dtypes_dict)
 
     @abc.abstractmethod
     def get_probability(self, down: int, to_go: int, position: int,
@@ -83,8 +83,7 @@ class DownOnlyLoader(BaseLoader):
                 provided
         """
         if play is PlayType.QB_SNEAK:
-            data = self.df[self.df['qb_scramle'] == 1 and
-                           self.df['play_type'] != 'no_play']
+            data = self.df.loc[(self.df['qb_scramble'] == 1) & (self.df['play_type'] != 'no_play')]
         elif play is PlayType.RUN:
             data = self.df[self.df['play_type'] == 'run']
         elif play is PlayType.PASS:
@@ -115,8 +114,7 @@ class FieldPositionLoader(BaseLoader):
                         play: PlayType) -> List[PlayOutcome]:
 
         if play is PlayType.QB_SNEAK:
-            data = self.df[self.df['qb_scramle'] == 1 and
-                           self.df['play_type'] != 'no_play']
+            data = self.df.loc[(self.df['qb_scramble'] == 1) & (self.df['play_type'] != 'no_play')]
         elif play is PlayType.RUN:
             data = self.df[self.df['play_type'] == 'run']
         elif play is PlayType.PASS:
