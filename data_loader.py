@@ -102,7 +102,7 @@ class DownOnlyLoader(BaseLoader):
 
         data['outcome'] = data.apply(determine_outcome, axis=1)
         count = len(data)
-        agg_cols = ['outcome', 'ydsnet']
+        agg_cols = ['outcome', 'yards_gained']
         prob_data = data.groupby(agg_cols).size().to_frame('prob') / count
         prob_data.reset_index(inplace=True)
         return [PlayOutcome(*p) for p in prob_data.values]
@@ -122,7 +122,33 @@ class FieldPositionLoader(BaseLoader):
         else:
             raise ValueError('PlayType not accepted for this class')
 
-        data = data[data['yardline_100'] == position]
+        def yardline_correction(row: pd.Series) -> int:
+            """Transforms 0-100 scale yardline data to be direction of possession team
+
+            The default loaded data is based on cardinal directionality (e.g. North-South or
+            East-West). The purpose of this function is to transform this data such that
+            the output represent how far the possession team must travel to the goal line
+            (e.g. )
+
+            Example:
+                dataframe.apply(yardline_correction, axis=1)
+
+                OWN 25 (yardline_100 = 25) -> yardline_100 = 75
+
+            Args:
+                row (pd.Series): single row of play-by-play data
+            Returns:
+                int: corrected 0-100 scale yardline distance based on distance from score
+            """
+
+            if row['posteam'] == row['side_of_field'] and row['yardline_100'] < 50:
+                return row['yardline_100'] + 2 * (50 - row['yardline_100'])
+            if row['posteam'] != row['side_of_field'] and row['yardline_100'] > 50:
+                return row['yardline_100'] - 2 * (row['yardline'] - 50)
+            return row['yardline_100']
+
+        data['fieldpos'] = data.apply(yardline_correction, axis=1)
+        data = data[data['fieldpos'] == position]
 
         def determine_outcome(row: pd.Series):
             if row['interception']:
@@ -135,7 +161,7 @@ class FieldPositionLoader(BaseLoader):
 
         data['outcome'] = data.apply(determine_outcome, axis=1)
         count = len(data)
-        agg_cols = ['outcome', 'ydsnet']
+        agg_cols = ['outcome', 'yards_gained']
         prob_data = data.groupby(agg_cols).size().to_frame('prob') / count
         prob_data.reset_index(inplace=True)
         return [PlayOutcome(*p) for p in prob_data.values]
