@@ -177,8 +177,16 @@ class FieldPositionLoader(BaseLoader):
                 outcome = OutcomeType.BALL_MOVED
             return outcome.name
 
-        data['outcome'] = data.apply(determine_outcome, axis=1)
+        data['outcome'] = data.apply(determine_outcome, axis=1).copy(deep=True)
         count = len(data)
+        if play is PlayType.FIELD_GOAL:
+            data['yards_gained'] = data.apply(
+                lambda r: position if r['outcome'] == 'FIELD_GOAL_MADE' else min(0, position - 20),
+                axis=1)
+        if play is PlayType.PUNT:
+            data['yards_gained'] = data.apply(
+                lambda r: r['kick_distance'] - r['punt_in_endzone'] if not r['punt_in_endzone'] else position - 20,
+                axis=1)
         agg_cols = ['outcome', 'yards_gained']
         prob_data = data.groupby(agg_cols).size().to_frame('prob') / count
         prob_data.reset_index(inplace=True)
@@ -198,15 +206,46 @@ if __name__ == '__main__':
 
     fol = FieldPositionLoader(fn)
 
+    #region offensive plays
+
     print('Prob')
     outcomes = fol.get_probability(2, 8, 80, PlayType.PASS)
     for o in outcomes:
         print(o)
+    print('\n\n')
 
-    # outcomes = fol.get_probability(4, 8, 20, PlayType.FIELD_GOAL)
-    # for o in outcomes:
-    #     print(o)
-    #
-    # outcomes = fol.get_probability(4, 8, 80, PlayType.PUNT)
-    # for o in outcomes:
-    #     print(o)
+    #endregion
+
+    #region field goal outcomes
+
+    outcomes = fol.get_probability(4, 8, 15, PlayType.FIELD_GOAL)
+    for o in outcomes:
+        print(o)
+    print('\n\n')
+
+    outcomes = fol.get_probability(4, 8, 20, PlayType.FIELD_GOAL)
+    for o in outcomes:
+        print(o)
+    print('\n\n')
+
+    outcomes = fol.get_probability(4, 8, 25, PlayType.FIELD_GOAL)
+    for o in outcomes:
+        print(o)
+    print('\n\n')
+
+    #endregion
+
+
+    #region punting
+
+    outcomes = fol.get_probability(4, 8, 80, PlayType.PUNT)
+    for o in outcomes:
+        print(o)
+    print('\n\n')
+
+    outcomes = fol.get_probability(4, 8, 40, PlayType.PUNT)
+    for o in outcomes:
+        print(o)
+    print('\n\n')
+
+    #endregion
