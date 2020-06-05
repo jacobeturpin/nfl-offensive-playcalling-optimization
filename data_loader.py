@@ -14,6 +14,8 @@ class PlayType(Enum):
     PASS = 1
     RUN = 2
     QB_SNEAK = 3
+    FIELD_GOAL = 4
+    PUNT = 5
 
 
 class OutcomeType(Enum):
@@ -21,6 +23,8 @@ class OutcomeType(Enum):
     INTERCEPTION = 2
     FUMBLE = 3
     TOUCHDOWN = 4
+    FIELD_GOAL_MADE = 5
+    FIELD_GOAL_MISSED = 6
 
 
 class BaseLoader:
@@ -110,10 +114,43 @@ class DownOnlyLoader(BaseLoader):
 
 class FieldPositionLoader(BaseLoader):
 
+    def __init__(self, filename: str):
+        super().__init__(filename)
+
+    @staticmethod
+    def __yardline_correction(row: pd.Series) -> int:
+        """Transforms 0-100 scale yardline data to be direction of possession team
+
+        The default loaded data is based on cardinal directionality (e.g. North-South or
+        East-West). The purpose of this function is to transform this data such that
+        the output represent how far the possession team must travel to the goal line
+        (e.g. )
+
+        Example:
+            dataframe.apply(yardline_correction, axis=1)
+
+            OWN 25 (yardline_100 = 25) -> yardline_100 = 75
+
+        Args:
+            row (pd.Series): single row of play-by-play data
+        Returns:
+            int: corrected 0-100 scale yardline distance based on distance from score
+        """
+
+        if row['posteam'] == row['side_of_field'] and row['yardline_100'] < 50:
+            return row['yardline_100'] + 2 * (50 - row['yardline_100'])
+        if row['posteam'] != row['side_of_field'] and row['yardline_100'] > 50:
+            return row['yardline_100'] - 2 * (row['yardline'] - 50)
+        return row['yardline_100']
+
     def get_probability(self, down: int, to_go: int, position: int,
                         play: PlayType) -> List[PlayOutcome]:
 
-        if play is PlayType.QB_SNEAK:
+        if play is PlayType.FIELD_GOAL:
+            data = self.df.loc[self.df['play_type'] == 'field_goal']
+        elif play is PlayType.PUNT:
+            data = self.df.loc[self.df['play_type'] == 'punt']
+        elif play is PlayType.QB_SNEAK:
             data = self.df.loc[(self.df['qb_scramble'] == 1) & (self.df['play_type'] != 'no_play')]
         elif play is PlayType.RUN:
             data = self.df[self.df['play_type'] == 'run']
@@ -122,45 +159,34 @@ class FieldPositionLoader(BaseLoader):
         else:
             raise ValueError('PlayType not accepted for this class')
 
-        def yardline_correction(row: pd.Series) -> int:
-            """Transforms 0-100 scale yardline data to be direction of possession team
-
-            The default loaded data is based on cardinal directionality (e.g. North-South or
-            East-West). The purpose of this function is to transform this data such that
-            the output represent how far the possession team must travel to the goal line
-            (e.g. )
-
-            Example:
-                dataframe.apply(yardline_correction, axis=1)
-
-                OWN 25 (yardline_100 = 25) -> yardline_100 = 75
-
-            Args:
-                row (pd.Series): single row of play-by-play data
-            Returns:
-                int: corrected 0-100 scale yardline distance based on distance from score
-            """
-
-            if row['posteam'] == row['side_of_field'] and row['yardline_100'] < 50:
-                return row['yardline_100'] + 2 * (50 - row['yardline_100'])
-            if row['posteam'] != row['side_of_field'] and row['yardline_100'] > 50:
-                return row['yardline_100'] - 2 * (row['yardline'] - 50)
-            return row['yardline_100']
-
-        data['fieldpos'] = data.apply(yardline_correction, axis=1)
+        data['fieldpos'] = data.apply(FieldPositionLoader.__yardline_correction, axis=1)
         data = data[data['fieldpos'] == position]
 
         def determine_outcome(row: pd.Series):
-            if row['interception']:
+
+            if play is PlayType.FIELD_GOAL:
+                outcome = OutcomeType.FIELD_GOAL_MADE if row['field_goal_result'] == 'made' \
+                    else OutcomeType.FIELD_GOAL_MISSED
+            elif row['interception']:
                 outcome = OutcomeType.INTERCEPTION
             elif row['fumble_lost']:
                 outcome = OutcomeType.FUMBLE
+            elif position == row['yards_gained']:
+                outcome = OutcomeType.TOUCHDOWN
             else:
                 outcome = OutcomeType.BALL_MOVED
             return outcome.name
 
-        data['outcome'] = data.apply(determine_outcome, axis=1)
+        data['outcome'] = data.apply(determine_outcome, axis=1).copy(deep=True)
         count = len(data)
+        if play is PlayType.FIELD_GOAL:
+            data['yards_gained'] = data.apply(
+                lambda r: position if r['outcome'] == 'FIELD_GOAL_MADE' else min(0, position - 20),
+                axis=1)
+        if play is PlayType.PUNT:
+            data['yards_gained'] = data.apply(
+                lambda r: r['kick_distance'] - r['punt_in_endzone'] if not r['punt_in_endzone'] else position - 20,
+                axis=1)
         agg_cols = ['outcome', 'yards_gained']
         prob_data = data.groupby(agg_cols).size().to_frame('prob') / count
         prob_data.reset_index(inplace=True)
@@ -169,18 +195,57 @@ class FieldPositionLoader(BaseLoader):
 
 if __name__ == '__main__':
     fn = './data/nfl-play-by-play.csv'
-    dol = DownOnlyLoader(fn)
 
-    print('Prob')
-    outcomes = dol.get_probability(2, 8, PlayType.RUN)
 
-    for o in outcomes:
-        print(o)
+    # dol = DownOnlyLoader(fn)
+    #
+    # print('Prob')
+    # outcomes = dol.get_probability(2, 8, PlayType.RUN)
+    # for o in outcomes:
+    #     print(o)
 
     fol = FieldPositionLoader(fn)
 
-    print('Prob')
-    outcomes = fol.get_probability(2, 8, 80, PlayType.RUN)
+    #region offensive plays
 
+    print('Prob')
+    outcomes = fol.get_probability(2, 8, 80, PlayType.PASS)
     for o in outcomes:
         print(o)
+    print('\n\n')
+
+    #endregion
+
+    #region field goal outcomes
+
+    outcomes = fol.get_probability(4, 8, 15, PlayType.FIELD_GOAL)
+    for o in outcomes:
+        print(o)
+    print('\n\n')
+
+    outcomes = fol.get_probability(4, 8, 20, PlayType.FIELD_GOAL)
+    for o in outcomes:
+        print(o)
+    print('\n\n')
+
+    outcomes = fol.get_probability(4, 8, 25, PlayType.FIELD_GOAL)
+    for o in outcomes:
+        print(o)
+    print('\n\n')
+
+    #endregion
+
+
+    #region punting
+
+    outcomes = fol.get_probability(4, 8, 80, PlayType.PUNT)
+    for o in outcomes:
+        print(o)
+    print('\n\n')
+
+    outcomes = fol.get_probability(4, 8, 40, PlayType.PUNT)
+    for o in outcomes:
+        print(o)
+    print('\n\n')
+
+    #endregion
