@@ -29,7 +29,7 @@ class NFLPlaycallingEnv(gym.Env):
 		# They must be gym.spaces objects
 
 		# three discrete actions - pass, run, qb sneak
-		self.action_space = spaces.Discrete(3)
+		self.action_space = spaces.Discrete(5)
 
 		# observation space: field position, down, to_go, turnover, touchdown
 		self.observation_space = spaces.Tuple((
@@ -37,7 +37,16 @@ class NFLPlaycallingEnv(gym.Env):
 			spaces.Discrete(4), #down
 			spaces.Discrete(99), #to_go
 			spaces.Discrete(2), #turnover
-			spaces.Discrete(2))) #touchdown
+			spaces.Discrete(2),#touchdown
+			spaces.Discrete(2))) # field_goal
+
+		self.action_dict = {
+			0: 'PASS',
+			1: 'RUN',
+			2: 'QB_SNEAK',
+			3: 'FIELD_GOAL',
+			4: 'PUNT'
+		}
 
 
 	def step(self, action):
@@ -49,55 +58,85 @@ class NFLPlaycallingEnv(gym.Env):
 
 		# start by handling turnovers
 		if obs[1] <= 0 or obs[3] == 1:
-			print(f"turnover {obs}")
+			print(f"action {self.action_dict[action]} turnover {obs}")
 			done = True
-			reward = -1.
-		# check if new field position is a touchdown
+			reward = -7. * (1 - obs[0]/100)
+		# check if observation state is a touchdown
 		elif obs[4] == 1:
-			print(f"td {obs}")
+			print(f"action {self.action_dict[action]} td {obs}")
 			done = True
-			reward = 1.
+			reward = 7.
+		# check if observation state is a field goal
+		elif obs[5] == 1:
+			print(f"action {self.action_dict[action]} field goal {obs}")
+			done = True
+			reward = 3.
 		# if not TO or TD then not done and no rewards
 		else:
-			print(f"continue {obs}")
+			print(f"action {self.action_dict[action]} continue {obs}")
 			done = False
 			reward = 0.
 		
+		print(f'state: done: {done}, reward: {reward}')
 		return obs, reward, done, {}
 
 	def _get_observation(self, action):
-		# TODO: replace with probabilistic outcomes
+		
+		# get outcomes from historical data
 		outcomes = self._get_field_pos(action)
-		outcome_idx = random.choices([i for i, x in enumerate(outcomes)], weights=[x[2] for x in outcomes])
+		try: 
+			outcome_idx = random.choices([i for i, x in enumerate(outcomes)], weights=[x[2] for x in outcomes])
+		except:
+			print(f"action {action}, outcomes: {outcomes}")
+			raise ValueError('no outcomes for action')
 		outcome = outcomes[outcome_idx[0]]
-		# print(f"outcome {outcome}")
+		# print(f"outcome selected {outcome}")
 
 		if outcome[0] == 'BALL_MOVED':
+			# update field position for any BALL_MOVED outcome
+			self.field_position = self.field_position + outcome[1]
+
 			# ball moved
-			if (outcome[1] + self.field_position) >= 100:
+			if action == 4:
+				#punted
+				self.turnover = 1
+			elif self.field_position >= 100:
+				# implied touchdown
 				self.field_position = 100
 				self.touchdown = 1
 			elif outcome[1] >= self.to_go:
-				self.remaining_downs = 4 # well get decremented to 3 below
-				self.to_go = 10 #TODO: add goalline situations
+				# first down
+				self.remaining_downs = 4 # will get decremented to 3 below
+				self.to_go = 100 - self.field_position if self.field_position >= 90 else 10
 			else:
+				# move the ball and decrement the down
 				self.to_go -= outcome[1]
-			self.field_position = self.field_position + outcome[1]
-		elif outcome[0] == "INTERCEPTION" or outcome[0] == "FUMBLE":
+
+		elif outcome[0] == 'INTERCEPTION' or outcome[0] == 'FUMBLE':
 			# turnover
 			self.turnover = 1
-		elif outcome[0] == "TOUCHDOWN":
+			self.field_position = self.field_position + outcome[1]
+		elif outcome[0] == 'TOUCHDOWN':
 			# touchdown
 			self.field_position = 100
 			self.touchdown = 1
+		elif outcome[0] == 'FIELD_GOAL_MADE':
+			# field goal was made
+			self.field_goal = 1
+		elif outcome[0] == 'FIELD_GOAL_MISSED':
+			# field goal was missed
+			self.turnover = 1
+			self.field_position = self.field_position + outcome[1]
 		else:
-			print("INVALID ACTION")
+			raise ValueError('invalid action')
 
 		# decrement downs
 		self.remaining_downs -= 1
 
 		# print(f"updates: yardline:{self.field_position} turnover:{self.turnover} td:{self.touchdown}")
-		return (self.field_position, self.remaining_downs, self.to_go, self.turnover, self.touchdown)
+		return self._return_obs_state()
+	def _return_obs_state(self):
+		return (self.field_position, self.remaining_downs, self.to_go, self.turnover, self.touchdown, self.field_goal)
 
 	def _gen_rand_outcomes(self):
 		
@@ -109,12 +148,21 @@ class NFLPlaycallingEnv(gym.Env):
 
 		return outcomes
 	def _get_field_pos(self, action):
+		"""Given an action, return the outcome based on the likelihood from historical data
+
+		Attributes:
+				action (int): Number associated with action taken for discrete observation space. See if statement for number coding
+		"""
 		if action == 0:
 			action_val = nfl_data.PlayType.PASS
 		elif action == 1:
 			action_val = nfl_data.PlayType.RUN
 		elif action == 2:
 			action_val = nfl_data.PlayType.QB_SNEAK
+		elif action == 3:
+			action_val = nfl_data.PlayType.FIELD_GOAL
+		elif action == 4:
+			action_val = nfl_data.PlayType.PUNT
 		else:
 			raise ValueError('invalid action')
 		# print(f"Action Taken {action_val}")
@@ -127,16 +175,28 @@ class NFLPlaycallingEnv(gym.Env):
 
 		return outcomes
 
+	def _set_field_pos(self, field_position = 20, remaining_downs = 3, to_go = 10, turnover = 0, touchdown = 0, field_goal = 0):
+		"""Used for testing to set different scenarios
+
+		Attributes:
+				field_position (int): 0-100 value of field position where 20 is own 20 and 80 is opp 20
+				remaining_downs (int): remaining downs before turnover
+				to_go (int): distance to go for first down
+				turnover (int): terminal state flag where 0=no turnover, 1=turnover
+				touchdown (int): terminal state flag where 0=no touchdown, 1=touchdown
+		"""
+		self.field_position = field_position
+		self.remaining_downs = remaining_downs
+		self.to_go = to_go
+		self.turnover = turnover
+		self.touchdown = touchdown
+		self.field_goal = field_goal
 
 	def reset(self):
 
-		self.field_position = 20
-		self.remaining_downs = 3
-		self.to_go = 10
-		self.turnover = 0
-		self.touchdown = 0
+		self._set_field_pos()
 
-		return (self.field_position, self.remaining_downs, self.to_go, self.turnover, self.touchdown)
+		return self._return_obs_state()
 
 	def render(self, mode='human'):
 

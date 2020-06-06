@@ -38,6 +38,39 @@ class BaseLoader:
         self.fn = filename
         self.df = pd.read_csv(self.fn, dtype = dtypes_dict)
 
+        self.df_indices = {}
+        self.df_indices['fg'] = self.df.loc[self.df['play_type'] == 'field_goal'].index
+        self.df_indices['punt'] = self.df.loc[self.df['play_type'] == 'punt'].index
+        self.df_indices['qb_sneak'] = self.df.loc[(self.df['qb_scramble'] == 1) & (self.df['play_type'] != 'no_play')].index
+        self.df_indices['run'] = self.df[self.df['play_type'] == 'run'].index
+        self.df_indices['pass'] = self.df[self.df['play_type'] == 'pass'].index
+
+        def __yardline_correction(row: pd.Series) -> int:
+            """Transforms 0-100 scale yardline data to be direction of possession team
+
+            The default loaded data is based on cardinal directionality (e.g. North-South or
+            East-West). The purpose of this function is to transform this data such that
+            the output represent how far the possession team must travel to the goal line
+            (e.g. )
+
+            Example:
+                dataframe.apply(yardline_correction, axis=1)
+
+                OWN 25 (yardline_100 = 25) -> yardline_100 = 75
+
+            Args:
+                row (pd.Series): single row of play-by-play data
+            Returns:
+                int: corrected 0-100 scale yardline distance based on distance from score
+            """
+
+            if row['posteam'] == row['side_of_field'] and row['yardline_100'] < 50:
+                return row['yardline_100'] + 2 * (50 - row['yardline_100'])
+            if row['posteam'] != row['side_of_field'] and row['yardline_100'] > 50:
+                return row['yardline_100'] - 2 * (row['yardline'] - 50)
+            return row['yardline_100']
+        self.df.loc[:,'fieldpos'] = self.df.apply(__yardline_correction, axis=1)
+
     @abc.abstractmethod
     def get_probability(self, down: int, to_go: int, position: int,
                         play: PlayType) -> List[PlayOutcome]:
@@ -114,53 +147,53 @@ class DownOnlyLoader(BaseLoader):
 
 class FieldPositionLoader(BaseLoader):
 
-    def __init__(self, filename: str):
-        super().__init__(filename)
+    def __init__(self, filename: str, dtypes_dict: dict = None):
+        super().__init__(filename, dtypes_dict)
 
-    @staticmethod
-    def __yardline_correction(row: pd.Series) -> int:
-        """Transforms 0-100 scale yardline data to be direction of possession team
+    # @staticmethod
+    # def __yardline_correction(row: pd.Series) -> int:
+    #     """Transforms 0-100 scale yardline data to be direction of possession team
 
-        The default loaded data is based on cardinal directionality (e.g. North-South or
-        East-West). The purpose of this function is to transform this data such that
-        the output represent how far the possession team must travel to the goal line
-        (e.g. )
+    #     The default loaded data is based on cardinal directionality (e.g. North-South or
+    #     East-West). The purpose of this function is to transform this data such that
+    #     the output represent how far the possession team must travel to the goal line
+    #     (e.g. )
 
-        Example:
-            dataframe.apply(yardline_correction, axis=1)
+    #     Example:
+    #         dataframe.apply(yardline_correction, axis=1)
 
-            OWN 25 (yardline_100 = 25) -> yardline_100 = 75
+    #         OWN 25 (yardline_100 = 25) -> yardline_100 = 75
 
-        Args:
-            row (pd.Series): single row of play-by-play data
-        Returns:
-            int: corrected 0-100 scale yardline distance based on distance from score
-        """
+    #     Args:
+    #         row (pd.Series): single row of play-by-play data
+    #     Returns:
+    #         int: corrected 0-100 scale yardline distance based on distance from score
+    #     """
 
-        if row['posteam'] == row['side_of_field'] and row['yardline_100'] < 50:
-            return row['yardline_100'] + 2 * (50 - row['yardline_100'])
-        if row['posteam'] != row['side_of_field'] and row['yardline_100'] > 50:
-            return row['yardline_100'] - 2 * (row['yardline'] - 50)
-        return row['yardline_100']
+    #     if row['posteam'] == row['side_of_field'] and row['yardline_100'] < 50:
+    #         return row['yardline_100'] + 2 * (50 - row['yardline_100'])
+    #     if row['posteam'] != row['side_of_field'] and row['yardline_100'] > 50:
+    #         return row['yardline_100'] - 2 * (row['yardline'] - 50)
+    #     return row['yardline_100']
 
     def get_probability(self, down: int, to_go: int, position: int,
                         play: PlayType) -> List[PlayOutcome]:
 
         if play is PlayType.FIELD_GOAL:
-            data = self.df.loc[self.df['play_type'] == 'field_goal']
+            data = self.df.iloc[self.df_indices['fg'], :]
         elif play is PlayType.PUNT:
-            data = self.df.loc[self.df['play_type'] == 'punt']
+            data = self.df.iloc[self.df_indices['punt'], :]
         elif play is PlayType.QB_SNEAK:
-            data = self.df.loc[(self.df['qb_scramble'] == 1) & (self.df['play_type'] != 'no_play')]
+            data = self.df.iloc[self.df_indices['qb_sneak'], :]
         elif play is PlayType.RUN:
-            data = self.df[self.df['play_type'] == 'run']
+            data = self.df.iloc[self.df_indices['run'], :]
         elif play is PlayType.PASS:
-            data = self.df[self.df['play_type'] == 'pass']
+            data = self.df.iloc[self.df_indices['pass'], :]
         else:
             raise ValueError('PlayType not accepted for this class')
 
-        data['fieldpos'] = data.apply(FieldPositionLoader.__yardline_correction, axis=1)
-        data = data[data['fieldpos'] == position]
+        # self.df.loc[:,'fieldpos'] = self.df.apply(FieldPositionLoader.__yardline_correction, axis=1)
+        data = data.loc[data['fieldpos'] == position]
 
         def determine_outcome(row: pd.Series):
 
@@ -177,20 +210,29 @@ class FieldPositionLoader(BaseLoader):
                 outcome = OutcomeType.BALL_MOVED
             return outcome.name
 
-        data['outcome'] = data.apply(determine_outcome, axis=1).copy(deep=True)
         count = len(data)
-        if play is PlayType.FIELD_GOAL:
-            data['yards_gained'] = data.apply(
-                lambda r: position if r['outcome'] == 'FIELD_GOAL_MADE' else min(0, position - 20),
-                axis=1)
-        if play is PlayType.PUNT:
-            data['yards_gained'] = data.apply(
-                lambda r: r['kick_distance'] - r['punt_in_endzone'] if not r['punt_in_endzone'] else position - 20,
-                axis=1)
-        agg_cols = ['outcome', 'yards_gained']
-        prob_data = data.groupby(agg_cols).size().to_frame('prob') / count
-        prob_data.reset_index(inplace=True)
-        return [PlayOutcome(*p) for p in prob_data.values]
+        
+        # check that there is data for the field position in question
+        if count == 0 and play is PlayType.FIELD_GOAL:
+          return [PlayOutcome('FIELD_GOAL_MISSED',min(-10, position - 10),1)]
+        elif count == 0:
+          return [PlayOutcome('BALL_MOVED',0,1)]
+
+        else:
+          data.loc[:,'outcome'] = data.apply(determine_outcome, axis=1).copy(deep=True)
+
+          if play is PlayType.FIELD_GOAL:
+              data.loc['yards_gained'] = data.apply(
+                  lambda r: position if r['outcome'] == 'FIELD_GOAL_MADE' else min(-10, position - 10),
+                  axis=1)
+          if play is PlayType.PUNT:
+              data['yards_gained'] = data.apply(
+                  lambda r: r['kick_distance'] - r['punt_in_endzone'] if not r['punt_in_endzone'] else position - 20,
+                  axis=1)
+          agg_cols = ['outcome', 'yards_gained']
+          prob_data = data.groupby(agg_cols).size().to_frame('prob') / count
+          prob_data.reset_index(inplace=True)
+          return [PlayOutcome(*p) for p in prob_data.values]
 
 
 if __name__ == '__main__':

@@ -97,7 +97,7 @@ if __name__ == '__main__':
 	writer = SummaryWriter(comment="-q-learning")
 
 	iter_no = 0
-	best_reward = 0.0
+	best_reward = -7.0
 	while True:
 		iter_no += 1
 		agent.play_n_random_steps(100)
@@ -113,7 +113,7 @@ if __name__ == '__main__':
 		if reward > best_reward:
 			print("Best reward updated %.3f -> %.3f" % (best_reward, reward))
 			best_reward = reward
-		if reward > 0.80:
+		if reward > 3:
 			print("Solved in %d iterations!" % iter_no)
 			break
 		
