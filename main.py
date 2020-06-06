@@ -100,7 +100,11 @@ if __name__ == '__main__':
 	best_reward = -7.0
 	while True:
 		iter_no += 1
+		print('=====================================')
+		print('Exploration')
 		agent.play_n_random_steps(100)
+		print('=====================================')
+		print('Exploitation')
 		agent.value_iteration()
 
 		reward = 0.0
@@ -112,8 +116,10 @@ if __name__ == '__main__':
 
 		if reward > best_reward:
 			print("Best reward updated %.3f -> %.3f" % (best_reward, reward))
+			print('=====================================')
 			best_reward = reward
-		if reward > 3:
+		if reward > 3.0:
+			print('=====================================')
 			print("Solved in %d iterations!" % iter_no)
 			break
 		

@@ -18,5 +18,5 @@ In order to setup this project, it's necessary to clone the repository and downl
 ```bash
 git clone https://github.com/jacobeturpin/nfl-offensive-playcalling-optimization.git
 cd nfl-offensive-playcalling-optimization
-mkdir data && kaggle datasets download maxhorowitz/nflplaybyplay2009to2016 -f "NFL Play by Play 2009-2018 (v5).csv" -p ./data/ --unzip
+kaggle datasets download maxhorowitz/nflplaybyplay2009to2016 -f "nfl-play-by-play.csv" -p ./data/ --unzip
 ```

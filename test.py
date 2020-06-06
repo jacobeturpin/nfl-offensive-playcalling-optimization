@@ -35,5 +35,7 @@ def test_play(environment):
 if __name__ == '__main__':
 	env = NFLPlaycallingEnv()
 
+	print(env.observation_space.shape)
+	print (env.observation_space)
 	random_play(env, render=True)
 	# test_play(env)

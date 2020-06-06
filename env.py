@@ -56,13 +56,9 @@ class NFLPlaycallingEnv(gym.Env):
 
 		# print(f"Step obs {obs} added to {self.field_position} remaining downs {self.remaining_downs}")
 
-		# start by handling turnovers
-		if obs[1] <= 0 or obs[3] == 1:
-			print(f"action {self.action_dict[action]} turnover {obs}")
-			done = True
-			reward = -7. * (1 - obs[0]/100)
+		
 		# check if observation state is a touchdown
-		elif obs[4] == 1:
+		if obs[4] == 1:
 			print(f"action {self.action_dict[action]} td {obs}")
 			done = True
 			reward = 7.
@@ -71,13 +67,18 @@ class NFLPlaycallingEnv(gym.Env):
 			print(f"action {self.action_dict[action]} field goal {obs}")
 			done = True
 			reward = 3.
+		# check if it is a turnover
+		elif obs[1] <= 0 or obs[3] == 1:
+			print(f"action {self.action_dict[action]} turnover {obs}")
+			done = True
+			reward = -7. * (1 - obs[0]/100)
 		# if not TO or TD then not done and no rewards
 		else:
 			print(f"action {self.action_dict[action]} continue {obs}")
 			done = False
 			reward = 0.
 		
-		print(f'state: done: {done}, reward: {reward}')
+		print(f'state: obs: {obs}, done: {done}, reward: {reward}')
 		return obs, reward, done, {}
 
 	def _get_observation(self, action):
@@ -86,11 +87,10 @@ class NFLPlaycallingEnv(gym.Env):
 		outcomes = self._get_field_pos(action)
 		try: 
 			outcome_idx = random.choices([i for i, x in enumerate(outcomes)], weights=[x[2] for x in outcomes])
+			outcome = outcomes[outcome_idx[0]]
 		except:
-			print(f"action {action}, outcomes: {outcomes}")
-			raise ValueError('no outcomes for action')
-		outcome = outcomes[outcome_idx[0]]
-		# print(f"outcome selected {outcome}")
+			print(f"NO OUTCOMES: action {action}, outcomes: {outcomes}")
+			outcome = nfl_data.PlayOutcome(type='BALL_MOVED', yards=0.0, prob=1)
 
 		if outcome[0] == 'BALL_MOVED':
 			# update field position for any BALL_MOVED outcome
