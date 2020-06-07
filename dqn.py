@@ -3,18 +3,18 @@ import numpy as np
 from keras.models import Sequential
 from keras.layers.core import Dense, Activation
 from keras.optimizers import Adam
-from keras.callbacks import TensorBoard
 import pandas as pd
 
 random.seed(0)
 
 import gym
 from env import NFLPlaycallingEnv
-env = NFLPlaycallingEnv()
 # env = gym.wrappers.Monitor(env, './runs', False, True)
 import matplotlib.pyplot as plt
 from collections import deque
 import time
+
+from tensorboardX import SummaryWriter
 
 class DQNAgent():
     def __init__(self, env, epsilon=1.0, alpha=0.5, gamma=0.9, time = 30000):
@@ -116,10 +116,7 @@ class DQNAgent():
 
         target_f[0][action] = target
 
-        # create callback for tensorboard
-        tensorboard_callback = TensorBoard(log_dir="./runs")
-
-        self.model.fit(state, target_f, epochs=1, verbose=0, callbacks=[tensorboard_callback])
+        self.model.fit(state, target_f, epochs=1, verbose=0)
         
         
 
@@ -145,8 +142,10 @@ class DQNAgent():
 
 if __name__ == '__main__':
 	start_time = time.time()
+	env = NFLPlaycallingEnv()
+	obs_size = len(env.observation_space)
 
-	# print(agent.model)
+	writer = SummaryWriter(comment="-dqn")
 
 	num_rounds = 100 # Payout calculated over num_rounds
 	num_samples = 50 # num_rounds simulated over num_samples
@@ -156,15 +155,16 @@ if __name__ == '__main__':
 	average_payouts = []
 
 	state = env.reset()
-	state = np.reshape(state[0:6], [1,6])
+	state = np.reshape(state[0:obs_size], [1,obs_size])
 	for sample in range(num_samples):
 			round = 1
 			total_payout = 0 # store total payout per sample
+			best_reward = 0 # store the best total reward across samples
 			while round <= num_rounds:
 					action = agent.choose_action(state)
 					next_state, payout, done, _ = env.step(action)
 					print(next_state)
-					next_state = np.reshape(next_state[0:6], [1,6])
+					next_state = np.reshape(next_state[0:obs_size], [1,obs_size])
 
 					
 					total_payout += payout    
@@ -172,14 +172,24 @@ if __name__ == '__main__':
 					agent.learn(state, action, payout, next_state, done)
 					
 					state = next_state
-					state = np.reshape(state[0:6], [1,6])
+					state = np.reshape(state[0:obs_size], [1,obs_size])
 					
 					if done:
 							state = env.reset() # Environment deals new cards to player and dealer
-							state = np.reshape(state[0:6], [1,6])
+							state = np.reshape(state[0:obs_size], [1,obs_size])
 							round += 1
 
 			average_payouts.append(total_payout)
+
+			writer.add_scalar("reward", total_payout, sample)
+
+      
+			if total_payout > best_reward:
+				print("Best reward updated %.3f -> %.3f" % (best_reward, total_payout))
+				print('=====================================')
+				best_reward = total_payout
+
+			writer.add_scalar("best_reward", best_reward, sample)
 
 			if sample % 1 == 0:
 					print('Done with sample: ' + str(sample) + str("   --- %s seconds ---" % (time.time() - start_time)))

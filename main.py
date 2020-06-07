@@ -112,12 +112,13 @@ if __name__ == '__main__':
 			reward += agent.play_episode(test_env)
 		reward /= TEST_EPISODES
 		writer.add_scalar("reward", reward, iter_no)
-		writer.add_scalar("best_reward", best_reward, iter_no)
 
 		if reward > best_reward:
 			print("Best reward updated %.3f -> %.3f" % (best_reward, reward))
 			print('=====================================')
 			best_reward = reward
+			
+		writer.add_scalar("best_reward", best_reward, iter_no)
 		if reward > 3.0:
 			print('=====================================')
 			print("Solved in %d iterations!" % iter_no)
