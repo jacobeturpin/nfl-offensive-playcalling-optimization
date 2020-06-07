@@ -1,11 +1,9 @@
-from gym import wrappers
-
-
 import random
 import numpy as np
 from keras.models import Sequential
 from keras.layers.core import Dense, Activation
 from keras.optimizers import Adam
+from keras.callbacks import TensorBoard
 import pandas as pd
 
 random.seed(0)
@@ -35,12 +33,17 @@ class DQNAgent():
         self.time = time 
         self.time_left = time # Epsilon Decay
         self.small_decrement = (0.4 * epsilon) / (0.3 * self.time_left) # reduce epsilon
-        print('HELLO')
+        print('Model Initialized')
     
     # Build Neural Net
     def _build_model(self):
+        """Create the model using Keras
+
+        Returns:
+          model (keras architecture): keras object specifying the model architecture
+		    """
         model = Sequential()
-        model.add(Dense(32, input_shape = (2,), kernel_initializer='random_uniform', activation='relu'))
+        model.add(Dense(32, input_shape = (len(self.state_size),), kernel_initializer='random_uniform', activation='relu'))
         model.add(Dense(16, activation='relu'))
         model.add(Dense(self.action_size, activation='softmax'))
         model.compile(loss='binary_crossentropy', optimizer=Adam(lr=self.alpha))
@@ -49,10 +52,14 @@ class DQNAgent():
        
 
     def choose_action(self, state):
-        """
-        Choose which action to take, based on the observation. 
-        Uses greedy epsilon for exploration/exploitation.
-        """
+        """Choose an action based. Exploration if random is below epsilon, best predicted action exploitation if not (greedy)
+        
+        Attributes:
+          state (np.Array): given current state as an array
+
+        Returns:
+          action (int): the action to be taken
+		    """
 
         # if random number > epsilon, act 'rationally'. otherwise, choose random action
         
@@ -69,10 +76,8 @@ class DQNAgent():
         return action
         
     def update_parameters(self):
-        """
-        Update epsilon and alpha after each action
-        Set them to 0 if not learning
-        """
+        """Update epsilon and alpha after each action. Set them to 0 if not learning
+		    """
 
         if self.time_left > 0.9 * self.time:
             self.epsilon -= self.small_decrement
@@ -91,6 +96,15 @@ class DQNAgent():
 
 
     def learn(self, state, action, reward, next_state, done):
+        """Choose an action based. Exploration if random is below epsilon, best predicted action exploitation if not (greedy)
+        
+        Attributes:
+          state (np.Array): given current state as an array
+          action (int): action to be taken
+          reward (float): current reward
+          next_state (np.Array): given state as an array after step has been taken
+          done (bool): flag if the episode is done
+		    """
         
         target = reward
 
@@ -102,7 +116,10 @@ class DQNAgent():
 
         target_f[0][action] = target
 
-        self.model.fit(state, target_f, epochs=1, verbose=0)
+        # create callback for tensorboard
+        tensorboard_callback = TensorBoard(log_dir="./runs")
+
+        self.model.fit(state, target_f, epochs=1, verbose=0, callbacks=[tensorboard_callback])
         
         
 
@@ -139,7 +156,7 @@ if __name__ == '__main__':
 	average_payouts = []
 
 	state = env.reset()
-	state = np.reshape(state[0:2], [1,2])
+	state = np.reshape(state[0:6], [1,6])
 	for sample in range(num_samples):
 			round = 1
 			total_payout = 0 # store total payout per sample
@@ -147,7 +164,7 @@ if __name__ == '__main__':
 					action = agent.choose_action(state)
 					next_state, payout, done, _ = env.step(action)
 					print(next_state)
-					next_state = np.reshape(next_state[0:2], [1,2])
+					next_state = np.reshape(next_state[0:6], [1,6])
 
 					
 					total_payout += payout    
@@ -155,11 +172,11 @@ if __name__ == '__main__':
 					agent.learn(state, action, payout, next_state, done)
 					
 					state = next_state
-					state = np.reshape(state[0:2], [1,2])
+					state = np.reshape(state[0:6], [1,6])
 					
 					if done:
 							state = env.reset() # Environment deals new cards to player and dealer
-							state = np.reshape(state[0:2], [1,2])
+							state = np.reshape(state[0:6], [1,6])
 							round += 1
 
 			average_payouts.append(total_payout)
@@ -172,10 +189,10 @@ if __name__ == '__main__':
 
 	# Plot payout per 1000 episodes for each value of 'sample'
 
-	plt.plot(average_payouts)           
-	plt.xlabel('num_samples')
-	plt.ylabel('payout after 1000 rounds')
-	plt.show()      
+	# plt.plot(average_payouts)           
+	# plt.xlabel('num_samples')
+	# plt.ylabel('payout after 1000 rounds')
+	# plt.show()      
 			
 	print ("Average payout after {} rounds is {}".format(num_rounds, sum(average_payouts)/(num_samples)))
 		

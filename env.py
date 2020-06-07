@@ -50,12 +50,17 @@ class NFLPlaycallingEnv(gym.Env):
 
 
 	def step(self, action):
+		"""Increment the environment one step given an action
+
+		Attributes:
+			action (int): 0-6 value specifying the action taken
+
+		Returns:
+			obs, reward, done, {} (Tuple): observations, current reward for step, and done flag
+		"""
 		assert self.action_space.contains(action)
 
 		obs = self._get_observation(action)
-
-		# print(f"Step obs {obs} added to {self.field_position} remaining downs {self.remaining_downs}")
-
 		
 		# check if observation state is a touchdown
 		if obs[4] == 1:
@@ -82,6 +87,14 @@ class NFLPlaycallingEnv(gym.Env):
 		return obs, reward, done, {}
 
 	def _get_observation(self, action):
+		"""Calculate the observation space using historical outcomes based on the action taken
+
+		Attributes:
+			action (int): 0-6 value specifying the action taken
+
+		Returns:
+			obs (Tuple of Discreet): the current observation space after the action has been applied
+		"""
 		
 		# get outcomes from historical data
 		outcomes = self._get_field_pos(action)
@@ -136,6 +149,8 @@ class NFLPlaycallingEnv(gym.Env):
 		# print(f"updates: yardline:{self.field_position} turnover:{self.turnover} td:{self.touchdown}")
 		return self._return_obs_state()
 	def _return_obs_state(self):
+		"""Return the observation space at a given time
+		"""
 		return (self.field_position, self.remaining_downs, self.to_go, self.turnover, self.touchdown, self.field_goal)
 
 	def _gen_rand_outcomes(self):
