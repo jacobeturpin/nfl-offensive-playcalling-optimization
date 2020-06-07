@@ -117,6 +117,11 @@ class DQNAgent():
         target_f[0][action] = target
 
         self.model.fit(state, target_f, epochs=1, verbose=0)
+
+    def save_weights(self, location):
+
+      # Save the weights
+      self.model.save_weights(location)
         
         
 
@@ -156,14 +161,15 @@ if __name__ == '__main__':
 
 	state = env.reset()
 	state = np.reshape(state[0:obs_size], [1,obs_size])
+	
+	best_reward = -7 # store the best total reward across samples
+
 	for sample in range(num_samples):
 			round = 1
 			total_payout = 0 # store total payout per sample
-			best_reward = 0 # store the best total reward across samples
 			while round <= num_rounds:
 					action = agent.choose_action(state)
 					next_state, payout, done, _ = env.step(action)
-					print(next_state)
 					next_state = np.reshape(next_state[0:obs_size], [1,obs_size])
 
 					
@@ -181,18 +187,21 @@ if __name__ == '__main__':
 
 			average_payouts.append(total_payout)
 
-			writer.add_scalar("reward", total_payout, sample)
+			reward = total_payout/num_rounds
+
+			writer.add_scalar("reward", reward, sample)
 
       
-			if total_payout > best_reward:
-				print("Best reward updated %.3f -> %.3f" % (best_reward, total_payout))
+			if reward > best_reward:
+				print("Best reward updated %.3f -> %.3f" % (best_reward, reward))
 				print('=====================================')
-				best_reward = total_payout
+				best_reward = reward
 
 			writer.add_scalar("best_reward", best_reward, sample)
 
 			if sample % 1 == 0:
 					print('Done with sample: ' + str(sample) + str("   --- %s seconds ---" % (time.time() - start_time)))
+					print(f"reward {reward}, best reward {best_reward}")
 					print(agent.epsilon)
 
 	# print(agent.get_optimal_strategy())
