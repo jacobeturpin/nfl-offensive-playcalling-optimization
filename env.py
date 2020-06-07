@@ -59,26 +59,26 @@ class NFLPlaycallingEnv(gym.Env):
 		
 		# check if observation state is a touchdown
 		if obs[4] == 1:
-			print(f"action {self.action_dict[action]} td {obs}")
+			# print(f"action {self.action_dict[action]} td {obs}")
 			done = True
 			reward = 7.
 		# check if observation state is a field goal
 		elif obs[5] == 1:
-			print(f"action {self.action_dict[action]} field goal {obs}")
+			# print(f"action {self.action_dict[action]} field goal {obs}")
 			done = True
 			reward = 3.
 		# check if it is a turnover
 		elif obs[1] <= 0 or obs[3] == 1:
-			print(f"action {self.action_dict[action]} turnover {obs}")
+			# print(f"action {self.action_dict[action]} turnover {obs}")
 			done = True
 			reward = -7. * (1 - obs[0]/100)
 		# if not TO or TD then not done and no rewards
 		else:
-			print(f"action {self.action_dict[action]} continue {obs}")
+			# print(f"action {self.action_dict[action]} continue {obs}")
 			done = False
 			reward = 0.
 		
-		print(f'state: obs: {obs}, done: {done}, reward: {reward}')
+		print(f'state: action {self.action_dict[action]}, obs: {obs}, done: {done}, reward: {reward}')
 		return obs, reward, done, {}
 
 	def _get_observation(self, action):
