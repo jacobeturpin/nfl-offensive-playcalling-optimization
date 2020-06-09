@@ -17,6 +17,11 @@ import time
 from tensorboardX import SummaryWriter
 
 class DQNAgent():
+    """
+		Agent for DQN to be used for NFLPlaycallingEnv
+		Referenced for DQN on Tuple Observation space: https://github.com/ml874/Blackjack--Reinforcement-Learning
+		"""
+
     def __init__(self, env, epsilon=1.0, alpha=0.5, gamma=0.9, time = 30000):
         self.env = env
         self.action_size = self.env.action_space.n
@@ -74,6 +79,29 @@ class DQNAgent():
         
         self.update_parameters()
         return action
+
+    def evaluation(self, state):
+        """Choose an action based. Exploration if random is below epsilon, best predicted action exploitation if not (greedy)
+        
+        Attributes:
+          state (np.Array): given current state as an array
+
+        Returns:
+          action (int): the action to be taken
+		    """
+        
+        print('=====================================')
+        print('Evaluation')
+        print('=====================================')
+        action_value = self.model.predict(state)
+        action = np.argmax(action_value[0])
+
+        print(f'For state: {state}, action is {action}')
+			
+			
+			
+			
+			
         
     def update_parameters(self):
         """Update epsilon and alpha after each action. Set them to 0 if not learning
@@ -123,25 +151,6 @@ class DQNAgent():
       # Save the weights
       self.model.save_weights(location)
         
-        
-
-    # def get_optimal_strategy(self):
-    #     index = []
-    #     for x in range(0,21):
-    #         for y in range(1,11):
-    #             index.append((x,y))
-
-    #     df = pd.DataFrame(index = index, columns = ['Stand', 'Hit'])
-
-    #     for ind in index:
-    #         outcome = self.model.predict([np.array([ind])], batch_size=1)
-    #         df.loc[ind, 'Stand'] = outcome[0][0]
-    #         df.loc[ind, 'Hit'] = outcome[0][1]
-
-
-    #     df['Optimal'] = df.apply(lambda x : 'Hit' if x['Hit'] >= x['Stand'] else 'Stand', axis=1)
-    #     df.to_csv('optimal_policy.csv')
-    #     return df
 
 
 
@@ -203,15 +212,12 @@ if __name__ == '__main__':
 					print('Done with sample: ' + str(sample) + str("   --- %s seconds ---" % (time.time() - start_time)))
 					print(f"reward {reward}, best reward {best_reward}")
 					print(agent.epsilon)
-
-	# print(agent.get_optimal_strategy())
-
-	# Plot payout per 1000 episodes for each value of 'sample'
-
-	# plt.plot(average_payouts)           
-	# plt.xlabel('num_samples')
-	# plt.ylabel('payout after 1000 rounds')
-	# plt.show()      
+    
 			
 	print ("Average payout after {} rounds is {}".format(num_rounds, sum(average_payouts)/(num_samples)))
+	
+	agent.evaluation((50,1,15,0,0,0))
+	agent.evaluation((98,3,2,0,0,0))
+	agent.evaluation((30,0,10,0,0,0))
+
 		
