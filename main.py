@@ -82,7 +82,6 @@ class Agent:
 				total = sum(target_counts.values())
 				for tgt_state, count in target_counts.items():
 					reward = self.rewards[(state, action, tgt_state)]
-					print(tgt_state)
 					best_action = self.select_action(tgt_state)
 					action_value += (count / total) * (reward + GAMMA * self.values[(tgt_state, best_action)])
 				self.values[(state, action)] = action_value
@@ -135,6 +134,7 @@ if __name__ == '__main__':
 		if iter_no >= 100:
 			print('=====================================')
 			print("Stopping after 100 iterations!")
+			break
 
 		
 		

@@ -48,7 +48,7 @@ class DQNAgent():
           model (keras architecture): keras object specifying the model architecture
 		    """
         model = Sequential()
-        model.add(Dense(32, input_shape = (len(self.state_size),), kernel_initializer='random_uniform', activation='relu'))
+        model.add(Dense(32, input_shape = (len(self.state_size)-3,), kernel_initializer='random_uniform', activation='relu'))
         model.add(Dense(16, activation='relu'))
         model.add(Dense(self.action_size, activation='softmax'))
         model.compile(loss='binary_crossentropy', optimizer=Adam(lr=self.alpha))
@@ -157,7 +157,7 @@ class DQNAgent():
 if __name__ == '__main__':
 	start_time = time.time()
 	env = NFLPlaycallingEnv()
-	obs_size = len(env.observation_space)
+	obs_size = len(env.observation_space)-3
 
 	writer = SummaryWriter(comment="-dqn")
 
@@ -216,8 +216,8 @@ if __name__ == '__main__':
 			
 	print ("Average payout after {} rounds is {}".format(num_rounds, sum(average_payouts)/(num_samples)))
 	
-	agent.evaluation((50,1,15,0,0,0))
-	agent.evaluation((98,3,2,0,0,0))
-	agent.evaluation((30,0,10,0,0,0))
+	agent.evaluation(np.array([50,1,15]).reshape(1,3))
+	agent.evaluation(np.array([99,0,1]).reshape(1,3))
+	agent.evaluation(np.array([30,0,10]).reshape(1,3))
 
 		
